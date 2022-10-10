@@ -28,7 +28,7 @@ def get_investment_value():
     return int(result["Parameter"]["Value"])
 
 def set_investment_value(value):
-    ssm.put_parameter(Name="eurojackbot-investment-value",
+    ssm.put_parameter(Name=parameter_store_variable_name,
                       Overwrite=True, Value=value)
 
 
@@ -82,14 +82,15 @@ def generate_discord_msg():
 
     set_investment_value(investment_value)
 
-    return f"{result}, voittoa {int(money_won)/100:.2f}€, sijoituksen tuotto {int(investment_value)/100:.2f}€"
+    return f"{result}, voittoa {int(money_won)/100:.2f}€, sijoituksen tuotto ||{int(investment_value)/100:.2f}€||"
 
 
 discord_key = os.environ.get("DISCORD_KEY")
 discord_channel_name = os.environ.get("DISCORD_CHANNEL_NAME")
+parameter_store_variable_name = os.environ.get("PARAMETER_STORE_VARIABLE_NAME")
 
-if not discord_key or not discord_channel_name:
-    print("No discord key and channel name, exiting")
+if not discord_key or not discord_channel_name or not parameter_store_variable_name:
+    print("Env variables missing, exiting")
     sys.exit()
 
 try:
