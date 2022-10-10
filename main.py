@@ -24,7 +24,7 @@ async def on_ready():
     await client.close()
 
 def get_investment_value():
-    result = ssm.get_parameter(Name="eurojackbot-investment-value")
+    result = ssm.get_parameter(Name=parameter_store_variable_name)
     return int(result["Parameter"]["Value"])
 
 def set_investment_value(value):
@@ -82,14 +82,16 @@ def generate_discord_msg():
 
     set_investment_value(investment_value)
 
-    return f"{result}, voittoa {int(money_won)/100:.2f}€, sijoituksen tuotto ||{int(investment_value)/100:.2f}€||"
+    return f"<@&{discord_group_id}> {result}, voittoa {int(money_won)/100:.2f}€, sijoituksen tuotto ||{int(investment_value)/100:.2f}€||"
 
 
 discord_key = os.environ.get("DISCORD_KEY")
 discord_channel_name = os.environ.get("DISCORD_CHANNEL_NAME")
+discord_group_id = os.environ.get("DISCORD_GROUP_ID")
+
 parameter_store_variable_name = os.environ.get("PARAMETER_STORE_VARIABLE_NAME")
 
-if not discord_key or not discord_channel_name or not parameter_store_variable_name:
+if not discord_key or not discord_channel_name or not parameter_store_variable_name or not discord_group_id:
     print("Env variables missing, exiting")
     sys.exit()
 
