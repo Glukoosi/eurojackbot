@@ -1,11 +1,10 @@
 Eurojackbot
 ===========
 
-Create `.env` file based on `.env.example` file. Then
+Create `env.json` file based on `env_example.json` file. Then
 ```
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-source .env
 python main.py
 ```

@@ -4,12 +4,15 @@ import os
 import sys
 import discord
 import boto3
+import json
+from pathlib import Path
+import asyncio
 
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-ssm = boto3.client("ssm", region_name="eu-north-1")
+ssm = boto3.client("ssm", region_name="eu-west-1")
 client = discord.Client(intents=intents)
 
 
@@ -85,6 +88,17 @@ def generate_discord_msg():
     return f"<@&{discord_group_id}> {result}, voittoa {int(money_won)/100:.2f}€, sijoituksen tuotto ||{int(investment_value)/100:.2f}€||"
 
 
+def lambda_handler(event=None, context=None):
+    asyncio.run(client.start(discord_key))
+
+
+if __name__ == "__main__":
+    if Path("env.json").is_file():
+        env_variables = json.load(open("env.json"))
+        for variable_name, variable_value in env_variables.get("Variables").items():
+            os.environ[variable_name] = variable_value
+
+
 discord_key = os.environ.get("DISCORD_KEY")
 discord_channel_name = os.environ.get("DISCORD_CHANNEL_NAME")
 discord_group_id = os.environ.get("DISCORD_GROUP_ID")
@@ -97,15 +111,11 @@ if not discord_key or not discord_channel_name or not parameter_store_variable_n
 
 try:
     primary_numbers = os.environ.get("EUROJACKPOT_PRIMARY_NUMBERS").split(",")
-    secondary_numbers = os.environ.get("EUROJACKPOT_SECONDARY_NUMBERS").split(",")
+    secondary_numbers = os.environ.get(
+        "EUROJACKPOT_SECONDARY_NUMBERS").split(",")
 except:
     print("No eurojacpot numbers, exiting")
     sys.exit()
-
-
-def lambda_handler(event=None, context=None):
-    client.run(discord_key)
-
 
 if __name__ == "__main__":
     lambda_handler()

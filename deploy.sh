@@ -6,6 +6,9 @@ zip -r ../deployment-package.zip .
 cd ..
 rm -rf deploy_package
 aws lambda update-function-code \
-    --function-name  eurojackbot \
+    --function-name eurojackbot \
     --zip-file fileb://deployment-package.zip
+aws lambda update-function-configuration \
+    --function-name eurojackbot \
+    --environment file://env_prod.json
 rm deployment-package.zip
