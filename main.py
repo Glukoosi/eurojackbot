@@ -23,8 +23,9 @@ async def on_ready():
         client.get_all_channels(), name=discord_channel_name)
 
     msg = generate_discord_msg(primary_numbers, secondary_numbers)
+    msg_with_mention = f"<@&{discord_group_id}>\n\n{msg}"
 
-    await client.get_channel(channel.id).send(msg)
+    await client.get_channel(channel.id).send(msg_with_mention)
     await client.close()
 
 
