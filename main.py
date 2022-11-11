@@ -19,8 +19,8 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    channel = discord.utils.get(
-        client.get_all_channels(), name=discord_channel_name)
+    # Discord allows multiple channels with same name -> use ID here
+    channel = client.get_channel(int(discord_channel_id))
 
     msg = generate_discord_msg(primary_numbers, secondary_numbers)
     msg_with_mention = f"<@&{discord_group_id}>\n\n{msg}"
@@ -130,11 +130,11 @@ def fetch_env_variables() -> None:
 if __name__ == "__main__":
     fetch_env_variables()
     discord_key = os.environ.get("DISCORD_KEY")
-    discord_channel_name = os.environ.get("DISCORD_CHANNEL_NAME")
+    discord_channel_id = os.environ.get("DISCORD_CHANNEL_ID")
     discord_group_id = os.environ.get("DISCORD_GROUP_ID")
     parameter_store_variable_name = os.environ.get("PARAMETER_STORE_VARIABLE_NAME")
 
-    if not discord_key or not discord_channel_name or not parameter_store_variable_name or not discord_group_id:
+    if not discord_key or not discord_channel_id or not parameter_store_variable_name or not discord_group_id:
         print("Env variables missing, exiting")
         sys.exit()
 
