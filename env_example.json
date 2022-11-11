@@ -1,6 +1,6 @@
 {
   "Variables": {
-    "DISCORD_CHANNEL_NAME": "testikannu",
+    "DISCORD_CHANNEL_ID": "channelid",
     "DISCORD_GROUP_ID": "groupid",
     "DISCORD_KEY": "discordkey123",
     "EUROJACKPOT_PRIMARY_NUMBERS": "1,2,3,4,5",
