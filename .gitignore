@@ -1,4 +1,7 @@
-venv/
+# Ignore possible IDE directories
 .idea/
+__pycache__/
+
+venv/
 env_prod.json
 env.json
