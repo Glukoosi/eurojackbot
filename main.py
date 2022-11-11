@@ -42,7 +42,7 @@ def set_investment_value(value):
 def get_eurojackpot_results() -> List[EuroJackpot]:
     now = datetime.datetime.now()
 
-    week = now.isocalendar().week - 1
+    week = now.isocalendar().week
     year = now.isocalendar().year
 
     r = requests.get(
