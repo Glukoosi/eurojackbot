@@ -79,8 +79,10 @@ def fetch_winnings(
             money_won = prize_tier.share_amount
             break
 
-    investment_value_old = 200  # get_investment_value()
+    investment_value_old = get_investment_value()
     investment_value_new = investment_value_old - 200 + money_won
+
+    set_investment_value(investment_value_new)
 
     return primary_hits, secondary_hits, money_won, investment_value_new
 
