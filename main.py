@@ -48,9 +48,6 @@ def get_eurojackpot_results() -> List[EuroJackpot]:
     r = requests.get(
         f"https://www.veikkaus.fi/api/draw-results/v1/games/EJACKPOT/draws/by-week/{year}-W{week}").json()
 
-    if len(r) == 0:
-        return []
-
     return [EuroJackpot(e) for e in r]
 
 
