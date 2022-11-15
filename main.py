@@ -29,14 +29,14 @@ async def on_ready():
     await client.close()
 
 
-def get_investment_value():
+def get_investment_value() -> int:
     result = ssm.get_parameter(Name=parameter_store_variable_name)
     return int(result["Parameter"]["Value"])
 
 
-def set_investment_value(value):
+def set_investment_value(value: int):
     ssm.put_parameter(Name=parameter_store_variable_name,
-                      Overwrite=True, Value=value)
+                      Overwrite=True, Value=str(value))
 
 
 def get_eurojackpot_results() -> List[EuroJackpot]:
