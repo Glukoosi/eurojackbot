@@ -105,10 +105,10 @@ def generate_discord_msg(env_variables):
         investment_value, env_variables["parameter_store_variable_name"])
 
     return f"""
-    <@&{env_variables['discord_group_id']}> {round_date_string} {result}, voittoa `{int(money_won)/100:,.2f}`€, sijoituksen tuotto ||{int(investment_value)/100:,.2f}€||
+<@&{env_variables['discord_group_id']}> {round_date_string} {result}, voittoa `{int(money_won)/100:,.2f}`€, sijoituksen tuotto ||{int(investment_value)/100:,.2f}€||
 
-    Isoin voitto tuloksella {biggest_winners_share_name} `{biggest_winners_share_amount/100:,.2f}`€
-    Seuraava päävoitto `{next_jackpot/100:,.2f}`€
+Isoin voitto tuloksella {biggest_winners_share_name} `{biggest_winners_share_amount/100:,.2f}`€
+Seuraava päävoitto `{next_jackpot/100:,.2f}`€
     """
 
 
