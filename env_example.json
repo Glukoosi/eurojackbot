@@ -5,7 +5,8 @@
     "DISCORD_KEY": "discordkey123",
     "EUROJACKPOT_PRIMARY_NUMBERS": "1,2,3,4,5",
     "EUROJACKPOT_SECONDARY_NUMBERS": "6,7",
-    "PARAMETER_STORE_VARIABLE_NAME": "parameter_name"
+    "PARAMETER_STORE_VARIABLE_NAME": "parameter_name",
+    "FETCH_LATEST_GAME_ONLY": true
   }
 }
 
