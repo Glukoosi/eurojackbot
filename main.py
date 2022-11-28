@@ -21,7 +21,6 @@ client = discord.Client(intents=intents)
 async def on_ready():
     env_variables = get_env_variables()
     channel_id = env_variables["discord_channel_id"]
-    group_id = env_variables["discord_group_id"]
 
     # Discord allows multiple channels with same name -> use ID here instead
     channel = client.get_channel(int(channel_id))
@@ -29,10 +28,9 @@ async def on_ready():
         print("Invalid or unknown Discord channel ID")
         sys.exit()
 
-    msg = generate_discord_msg(env_variables)
-    msg_with_mention = f"<@&{group_id}>\n\n{msg}"
+    message = generate_discord_msg(env_variables)
 
-    await channel.send(msg_with_mention)
+    await channel.send(message)
     await client.close()
 
 
@@ -53,6 +51,11 @@ def get_eurojackpot_next_jackpot() -> int:
 
 
 def get_eurojackpot_results() -> List[EuroJackpot]:
+    """
+    Request current weeks Eurojackpot data from the Veikkaus API.
+
+    :return: List of Eurojackpot game objects, or an empty list if no games available yet for current week.
+    """
     now = datetime.datetime.now()
 
     week = now.isocalendar().week
@@ -66,21 +69,30 @@ def get_eurojackpot_results() -> List[EuroJackpot]:
 
 def fetch_winnings(
         eurojackpot: EuroJackpot,
-        guesses_primary: List[str],
-        guesses_secondary: List[str],
+        primary_numbers: List[str],
+        secondary_numbers: List[str],
         parameter_store_variable_name: str
 ) -> Tuple[int, int, int, int]:
+    """
+    Fetch winnings for one Eurojackpot game.
+
+    :param eurojackpot: The Eurojackpot game object.
+    :param primary_numbers: Primary numbers for the Eurojackpot lottery.
+    :param secondary_numbers: Secondary numbers for the Eurojackpot lottery.
+    :param parameter_store_variable_name: Variable names for retrieving data from the AWS storage.
+    :return: Tuple containing hits for primary numbers and secondary numbers, money won and updated investment value.
+    """
     primary_results = eurojackpot.results[0].primary
     secondary_results = eurojackpot.results[0].secondary
 
     primary_hits = 0
     for number in primary_results:
-        if number in guesses_primary:
+        if number in primary_numbers:
             primary_hits += 1
 
     secondary_hits = 0
     for number in secondary_results:
-        if number in guesses_secondary:
+        if number in secondary_numbers:
             secondary_hits += 1
 
     total_hits = f"{primary_hits}+{secondary_hits} oikein"
@@ -99,10 +111,18 @@ def fetch_winnings(
 
 
 def generate_discord_msg(env_variables) -> str:
+    """
+    Generate the final message to send to Discord. Contains only one or all Eurojackpot game results depending on
+    settings in env.json.
+
+    :param env_variables: Environment variables read to dictionary from env.json.
+    :return: A message that can be sent to Discord straight away.
+    """
     primary_numbers = env_variables["primary_numbers"]
     secondary_numbers = env_variables["secondary_numbers"]
     parameter_store_variable_name = env_variables["parameter_store_variable_name"]
     latest_game_only = env_variables["latest_game_only"]
+    group_id = env_variables["discord_group_id"]
 
     messages = []
     eurojackpots = get_eurojackpot_results()
@@ -130,7 +150,8 @@ def generate_discord_msg(env_variables) -> str:
 
         messages.append(msg)
 
-    return "\n--\n".join(messages)
+    joined = "\n--\n".join(messages)
+    return f"<@&{group_id}>\n\n{joined}"
 
 
 def get_env_variables() -> Dict[str, str]:
