@@ -3,6 +3,7 @@ from models import (
     PrizeTier as PrizeTierPayload,
     Result as ResultPayload
 )
+from typing import Optional
 
 
 class Result:
@@ -36,3 +37,16 @@ class EuroJackpot:
         self.results_available_time = payload["resultsAvailableTime"]
         self.results = [Result(result) for result in payload["results"]]
         self.prize_tiers = [PrizeTier(prize_tier) for prize_tier in payload["prizeTiers"]]
+
+    @property
+    def biggest_prize_tier(self) -> Optional[PrizeTier]:
+        biggest_share = 0
+        biggest_prize_tier = None
+        for prize_tier in self.prize_tiers:
+
+            share_amount = prize_tier.share_amount
+            if share_amount > biggest_share:
+                biggest_prize_tier = prize_tier
+                biggest_share = prize_tier.share_amount
+
+        return biggest_prize_tier
