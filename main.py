@@ -1,5 +1,5 @@
 from eurojackpot import EuroJackpot
-from typing import List, Tuple, Union
+from typing import List, Tuple
 import requests
 import datetime
 import os
@@ -7,7 +7,7 @@ import sys
 import discord
 import boto3
 import json
-import asyncio
+from pathlib import Path
 
 
 intents = discord.Intents.default()
@@ -19,27 +19,43 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    # Discord allows multiple channels with same name -> use ID here
-    channel = client.get_channel(int(discord_channel_id))
+    env_variables = get_env_variables()
+    channel_id = env_variables["discord_channel_id"]
 
-    msg = generate_discord_msg(primary_numbers, secondary_numbers)
-    msg_with_mention = f"<@&{discord_group_id}>\n\n{msg}"
+    # Discord allows multiple channels with same name -> use ID here instead
+    channel = client.get_channel(int(channel_id))
+    if not channel:
+        print("Invalid or unknown Discord channel ID")
+        sys.exit()
 
-    await client.get_channel(channel.id).send(msg_with_mention)
+    message = generate_discord_msg(env_variables)
+
+    await channel.send(message)
     await client.close()
 
 
-def get_investment_value() -> int:
+def get_investment_value(parameter_store_variable_name: str) -> int:
     result = ssm.get_parameter(Name=parameter_store_variable_name)
     return int(result["Parameter"]["Value"])
 
 
-def set_investment_value(value: int):
+def set_investment_value(value: int, parameter_store_variable_name: str) -> None:
     ssm.put_parameter(Name=parameter_store_variable_name,
                       Overwrite=True, Value=str(value))
 
 
+def get_eurojackpot_next_jackpot() -> int:
+    r = requests.get(
+        "https://msa.veikkaus.fi/jackpot/v1/latest-jackpot-results.json").json()
+    return r["draws"]["EJACKPOT"][0]["jackpots"][0]["amount"]
+
+
 def get_eurojackpot_results() -> List[EuroJackpot]:
+    """
+    Request current weeks Eurojackpot data from the Veikkaus API.
+
+    :return: List of Eurojackpot game objects, or an empty list if no games available yet for current week.
+    """
     now = datetime.datetime.now()
 
     week = now.isocalendar().week
@@ -53,19 +69,30 @@ def get_eurojackpot_results() -> List[EuroJackpot]:
 
 def fetch_winnings(
         eurojackpot: EuroJackpot,
-        guesses_primary: List[str],
-        guesses_secondary: List[str]) -> Tuple[int, int, int, int]:
+        primary_numbers: List[str],
+        secondary_numbers: List[str],
+        parameter_store_variable_name: str
+) -> Tuple[int, int, int, int]:
+    """
+    Fetch winnings for one Eurojackpot game.
+
+    :param eurojackpot: The Eurojackpot game object.
+    :param primary_numbers: Primary numbers for the Eurojackpot lottery.
+    :param secondary_numbers: Secondary numbers for the Eurojackpot lottery.
+    :param parameter_store_variable_name: Variable names for retrieving data from the AWS storage.
+    :return: Tuple containing hits for primary numbers and secondary numbers, money won and updated investment value.
+    """
     primary_results = eurojackpot.results[0].primary
     secondary_results = eurojackpot.results[0].secondary
 
     primary_hits = 0
     for number in primary_results:
-        if number in guesses_primary:
+        if number in primary_numbers:
             primary_hits += 1
 
     secondary_hits = 0
     for number in secondary_results:
-        if number in guesses_secondary:
+        if number in secondary_numbers:
             secondary_hits += 1
 
     total_hits = f"{primary_hits}+{secondary_hits} oikein"
@@ -76,70 +103,101 @@ def fetch_winnings(
             money_won = prize_tier.share_amount
             break
 
-    investment_value_old = get_investment_value()
+    investment_value_old = get_investment_value(parameter_store_variable_name)
     investment_value_new = investment_value_old - 200 + money_won
-
-    set_investment_value(investment_value_new)
+    set_investment_value(investment_value_new, parameter_store_variable_name)
 
     return primary_hits, secondary_hits, money_won, investment_value_new
 
 
-def generate_discord_msg(guesses_primary: List[Union[int, str]], guesses_secondary: List[Union[int, str]]) -> str:
-    guesses_primary = [str(i) for i in guesses_primary]
-    guesses_secondary = [str(i) for i in guesses_secondary]
+def generate_discord_msg(env_variables) -> str:
+    """
+    Generate the final message to send to Discord. Contains only one or all Eurojackpot game results depending on
+    settings in env.json.
 
-    ejackpot_messages = []
-    results = get_eurojackpot_results()
-    if not results:
+    :param env_variables: Environment variables read to dictionary from env.json.
+    :return: A message that can be sent to Discord straight away.
+    """
+    primary_numbers = env_variables["primary_numbers"]
+    secondary_numbers = env_variables["secondary_numbers"]
+    parameter_store_variable_name = env_variables["parameter_store_variable_name"]
+    latest_game_only = env_variables["latest_game_only"]
+    group_id = env_variables["discord_group_id"]
+
+    messages = []
+    eurojackpots = get_eurojackpot_results()
+    if not eurojackpots:
         return "Tuloksia ei saatu Veikkaukselta :("
+    elif latest_game_only:
+        eurojackpots = eurojackpots[-1:]
 
-    for result in results:
-        info = fetch_winnings(result, guesses_primary, guesses_secondary)
+    for eurojackpot in eurojackpots:
+        winnings = fetch_winnings(eurojackpot, primary_numbers, secondary_numbers, parameter_store_variable_name)
+        primary_hits = winnings[0]
+        secondary_hits = winnings[1]
+        money_won = winnings[2]
+        investment_value = winnings[3]
 
-        primary_hits = info[0]
-        secondary_hits = info[1]
-        money_won = info[2]
-        investment_value = info[3]
+        ejackpot_week = datetime.datetime.fromtimestamp(eurojackpot.close_time/1000).isocalendar().week
+        weekday = eurojackpot.brand_name.split("-")[0]
 
-        ejackpot_week = datetime.datetime.fromtimestamp(result.close_time/1000).isocalendar().week
-        game = result.brand_name.split("-")[1]
-        weekday = result.brand_name.split("-")[0]
-        msg = f"{game} viikko {ejackpot_week}/{weekday}, " \
-              f"{primary_hits}+{secondary_hits} oikein, " \
-              f"voittoa {int(money_won)/100:.2f}€, " \
-              f"sijoituksen tuotto ||{investment_value/100:.2f}€||"
-        ejackpot_messages.append(msg)
+        biggest_prize_tier = eurojackpot.biggest_prize_tier
 
-    return "\n".join(ejackpot_messages)
+        msg = f"W{ejackpot_week}/{weekday} {primary_hits}+{secondary_hits} oikein, " \
+              f"voittoa `{int(money_won) / 100:,.2f}`€, sijoituksen tuotto ||{investment_value / 100:,.2f}||€\n\n" \
+              f"Isoin voitto tuloksella {biggest_prize_tier.name} `{biggest_prize_tier.share_amount / 100:,.2f}`€\n" \
+              f"Seuraava päävoitto `{get_eurojackpot_next_jackpot() / 100:,.2f}`€"
 
+        messages.append(msg)
 
-def lambda_handler(event=None, context=None):
-    asyncio.run(client.start(discord_key))
-
-
-def fetch_env_variables() -> None:
-    with open("env.json", "r") as env_file:
-        env_variables = json.load(env_file)
-        for variable_name, variable_value in env_variables.get("Variables").items():
-            os.environ[variable_name] = variable_value
+    joined = "\n--\n".join(messages)
+    return f"<@&{group_id}>\n\n{joined}"
 
 
-if __name__ == "__main__":
-    fetch_env_variables()
-    discord_key = os.environ.get("DISCORD_KEY")
+def get_env_variables():
     discord_channel_id = os.environ.get("DISCORD_CHANNEL_ID")
     discord_group_id = os.environ.get("DISCORD_GROUP_ID")
-    parameter_store_variable_name = os.environ.get("PARAMETER_STORE_VARIABLE_NAME")
 
-    if not discord_key or not discord_channel_id or not parameter_store_variable_name or not discord_group_id:
+    parameter_store_variable_name = os.environ.get(
+        "PARAMETER_STORE_VARIABLE_NAME")
+
+    if not discord_channel_id or not parameter_store_variable_name or not discord_group_id:
         print("Env variables missing, exiting")
         sys.exit()
 
-    primary_numbers = os.environ.get("EUROJACKPOT_PRIMARY_NUMBERS").split(",")
-    secondary_numbers = os.environ.get("EUROJACKPOT_SECONDARY_NUMBERS").split(",")
-
-    if not primary_numbers or not secondary_numbers:
-        print("No Eurojackpot numbers. Exiting.")
+    try:
+        primary_numbers = os.environ.get(
+            "EUROJACKPOT_PRIMARY_NUMBERS").split(",")
+        secondary_numbers = os.environ.get(
+            "EUROJACKPOT_SECONDARY_NUMBERS").split(",")
+    except:
+        print("No eurojackpot numbers, exiting")
         sys.exit()
 
+    latest_game_only = os.environ.get("FETCH_LATEST_GAME_ONLY").lower() in ["true", "1"]
+
+    return {
+        "discord_channel_id": discord_channel_id,
+        "discord_group_id": discord_group_id,
+        "parameter_store_variable_name": parameter_store_variable_name,
+        "primary_numbers": primary_numbers,
+        "secondary_numbers": secondary_numbers,
+        "latest_game_only": latest_game_only
+    }
+
+
+def lambda_handler():
+    discord_key = os.environ.get("DISCORD_KEY")
+    if not discord_key:
+        print("No discord key, exiting")
+        sys.exit()
+
+    client.run(discord_key)
+
+
+if __name__ == "__main__":
+    if Path("env.json").is_file():
+        env_vars_tmp = json.load(open("env.json"))
+        for variable_name, variable_value in env_vars_tmp.get("Variables", {}).items():
+            os.environ[variable_name] = str(variable_value)
     lambda_handler()

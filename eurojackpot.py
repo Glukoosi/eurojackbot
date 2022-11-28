@@ -36,3 +36,21 @@ class EuroJackpot:
         self.results_available_time = payload["resultsAvailableTime"]
         self.results = [Result(result) for result in payload["results"]]
         self.prize_tiers = [PrizeTier(prize_tier) for prize_tier in payload["prizeTiers"]]
+
+    @property
+    def biggest_prize_tier(self) -> PrizeTier:
+        """
+        A prize tier having the most winnings. If no winnings at all, returns 5+2 correct with zero shareAmount.
+
+        :return: Prize tier with the best share amount, or 5+2 correct with zero share amount.
+        """
+        biggest_share = 0
+        biggest_prize_tier = self.prize_tiers[0]
+        for prize_tier in self.prize_tiers:
+
+            share_amount = prize_tier.share_amount
+            if share_amount > biggest_share:
+                biggest_prize_tier = prize_tier
+                biggest_share = prize_tier.share_amount
+
+        return biggest_prize_tier
