@@ -186,7 +186,7 @@ def get_env_variables():
     }
 
 
-def lambda_handler():
+def lambda_handler(event=None, context=None):
     discord_key = os.environ.get("DISCORD_KEY")
     if not discord_key:
         print("No discord key, exiting")
