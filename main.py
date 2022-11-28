@@ -102,11 +102,14 @@ def generate_discord_msg(env_variables) -> str:
     primary_numbers = env_variables["primary_numbers"]
     secondary_numbers = env_variables["secondary_numbers"]
     parameter_store_variable_name = env_variables["parameter_store_variable_name"]
+    latest_game_only = env_variables["latest_game_only"]
 
     messages = []
     eurojackpots = get_eurojackpot_results()
     if not eurojackpots:
         return "Tuloksia ei saatu Veikkaukselta :("
+    elif latest_game_only:
+        eurojackpots = eurojackpots[-1:]
 
     for eurojackpot in eurojackpots:
         winnings = fetch_winnings(eurojackpot, primary_numbers, secondary_numbers, parameter_store_variable_name)
@@ -150,12 +153,15 @@ def get_env_variables() -> Dict[str, str]:
         print("No eurojackpot numbers, exiting")
         sys.exit()
 
+    latest_game_only = os.environ.get("FETCH_LATEST_GAME_ONLY").lower() in ["true", "1"]
+
     return {
         "discord_channel_id": discord_channel_id,
         "discord_group_id": discord_group_id,
         "parameter_store_variable_name": parameter_store_variable_name,
         "primary_numbers": primary_numbers,
         "secondary_numbers": secondary_numbers,
+        "latest_game_only": latest_game_only
     }
 
 
@@ -172,5 +178,5 @@ if __name__ == "__main__":
     if Path("env.json").is_file():
         env_vars_tmp = json.load(open("env.json"))
         for variable_name, variable_value in env_vars_tmp.get("Variables", {}).items():
-            os.environ[variable_name] = variable_value
+            os.environ[variable_name] = str(variable_value)
     lambda_handler()
