@@ -1,5 +1,5 @@
 from eurojackpot import EuroJackpot
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 import requests
 import datetime
 import os
@@ -154,7 +154,7 @@ def generate_discord_msg(env_variables) -> str:
     return f"<@&{group_id}>\n\n{joined}"
 
 
-def get_env_variables() -> Dict[str, str]:
+def get_env_variables():
     discord_channel_id = os.environ.get("DISCORD_CHANNEL_ID")
     discord_group_id = os.environ.get("DISCORD_GROUP_ID")
 
