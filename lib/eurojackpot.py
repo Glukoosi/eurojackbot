@@ -1,4 +1,4 @@
-from models import (
+from lib.models import (
     EuroJackpot as EuroJackpotPayload,
     PrizeTier as PrizeTierPayload,
     Result as ResultPayload

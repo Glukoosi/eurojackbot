@@ -1,5 +1,5 @@
 mkdir deploy_package
-cp main.py eurojackpot.py models.py deploy_package/
+cp -r main.py lib/ deploy_package/
 pip3 install --target ./deploy_package -r requirements.txt
 cd deploy_package
 zip -r ../deployment-package.zip .

@@ -1,4 +1,4 @@
-from eurojackpot import EuroJackpot
+from lib.eurojackpot import EuroJackpot
 from typing import List, Tuple
 import requests
 import datetime
