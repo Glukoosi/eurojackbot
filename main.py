@@ -4,34 +4,12 @@ import requests
 import datetime
 import os
 import sys
-import discord
 import boto3
 import json
 from pathlib import Path
 
 
-intents = discord.Intents.default()
-intents.message_content = True
-
 ssm = boto3.client("ssm", region_name="eu-west-1")
-client = discord.Client(intents=intents)
-
-
-@client.event
-async def on_ready():
-    env_variables = get_env_variables()
-    channel_id = env_variables["discord_channel_id"]
-
-    # Discord allows multiple channels with same name -> use ID here instead
-    channel = client.get_channel(int(channel_id))
-    if not channel:
-        print("Invalid or unknown Discord channel ID")
-        sys.exit()
-
-    message = generate_discord_msg(env_variables)
-
-    await channel.send(message)
-    await client.close()
 
 
 def get_investment_value(parameter_store_variable_name: str) -> int:
@@ -47,7 +25,10 @@ def set_investment_value(value: int, parameter_store_variable_name: str) -> None
 def get_eurojackpot_next_jackpot() -> int:
     r = requests.get(
         "https://msa.veikkaus.fi/jackpot/v1/latest-jackpot-results.json").json()
-    return r["draws"]["EJACKPOT"][0]["jackpots"][0]["amount"]
+    if r["draws"].get("EJACKPOT"):
+        return r["draws"]["EJACKPOT"][0]["jackpots"][0]["amount"]
+    else:
+        return 0
 
 
 def get_eurojackpot_results() -> List[EuroJackpot]:
@@ -131,37 +112,45 @@ def generate_discord_msg(env_variables) -> str:
     elif latest_game_only:
         eurojackpots = eurojackpots[-1:]
 
+    next_jackpot = get_eurojackpot_next_jackpot()
+    if next_jackpot == 0:
+        next_jackpot = "ei tiedossa"
+    else:
+        next_jackpot = f"`{next_jackpot / 100:,.2f}`€"
+
     for eurojackpot in eurojackpots:
-        winnings = fetch_winnings(eurojackpot, primary_numbers, secondary_numbers, parameter_store_variable_name)
+        winnings = fetch_winnings(
+            eurojackpot, primary_numbers, secondary_numbers, parameter_store_variable_name)
         primary_hits = winnings[0]
         secondary_hits = winnings[1]
         money_won = winnings[2]
         investment_value = winnings[3]
 
-        ejackpot_week = datetime.datetime.fromtimestamp(eurojackpot.close_time/1000).isocalendar().week
+        ejackpot_week = datetime.datetime.fromtimestamp(
+            eurojackpot.close_time/1000).isocalendar().week
         weekday = eurojackpot.brand_name.split("-")[0]
 
         biggest_prize_tier = eurojackpot.biggest_prize_tier
 
         msg = f"W{ejackpot_week}/{weekday} {primary_hits}+{secondary_hits} oikein, " \
-              f"voittoa `{int(money_won) / 100:,.2f}`€, sijoituksen tuotto ||{investment_value / 100:,.2f}||€\n\n" \
-              f"Isoin voitto tuloksella {biggest_prize_tier.name} `{biggest_prize_tier.share_amount / 100:,.2f}`€\n" \
-              f"Seuraava päävoitto `{get_eurojackpot_next_jackpot() / 100:,.2f}`€"
+              f"voittoa `{int(money_won) / 100:,.2f}`€, sijoituksen tuotto ||{investment_value / 100:,.2f}||€\n" \
+              f"Isoin voitto tuloksella {biggest_prize_tier.name} `{biggest_prize_tier.share_amount / 100:,.2f}`€"
 
         messages.append(msg)
 
     joined = "\n--\n".join(messages)
-    return f"<@&{group_id}>\n\n{joined}"
+    return f"<@&{group_id}>\n{joined}\n\nSeuraava päävoitto {next_jackpot}"
 
 
 def get_env_variables():
+    discord_key = os.environ.get("DISCORD_KEY")
     discord_channel_id = os.environ.get("DISCORD_CHANNEL_ID")
     discord_group_id = os.environ.get("DISCORD_GROUP_ID")
 
     parameter_store_variable_name = os.environ.get(
         "PARAMETER_STORE_VARIABLE_NAME")
 
-    if not discord_channel_id or not parameter_store_variable_name or not discord_group_id:
+    if not discord_channel_id or not parameter_store_variable_name or not discord_group_id or not discord_key:
         print("Env variables missing, exiting")
         sys.exit()
 
@@ -174,9 +163,11 @@ def get_env_variables():
         print("No eurojackpot numbers, exiting")
         sys.exit()
 
-    latest_game_only = os.environ.get("FETCH_LATEST_GAME_ONLY").lower() in ["true", "1"]
+    latest_game_only = os.environ.get(
+        "FETCH_LATEST_GAME_ONLY").lower() in ["true", "1"]
 
     return {
+        "discord_key": discord_key,
         "discord_channel_id": discord_channel_id,
         "discord_group_id": discord_group_id,
         "parameter_store_variable_name": parameter_store_variable_name,
@@ -187,12 +178,16 @@ def get_env_variables():
 
 
 def lambda_handler(event=None, context=None):
-    discord_key = os.environ.get("DISCORD_KEY")
-    if not discord_key:
-        print("No discord key, exiting")
-        sys.exit()
+    env_variables = get_env_variables()
+    discord_key = env_variables["discord_key"]
+    channel_id = env_variables["discord_channel_id"]
 
-    client.run(discord_key)
+    message = generate_discord_msg(env_variables)
+
+    r = requests.post(f"https://discord.com/api/channels/{channel_id}/messages", headers={
+                      "Authorization": f"Bot {discord_key}"}, json={"content": message})
+    if r.status_code != 200:
+        print("Failed to post to discord api, code " + str(r.status_code))
 
 
 if __name__ == "__main__":
