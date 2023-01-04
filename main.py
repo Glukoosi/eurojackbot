@@ -43,7 +43,7 @@ def get_eurojackpot_results() -> List[EuroJackpot]:
     year = now.isocalendar().year
 
     r = requests.get(
-        f"https://www.veikkaus.fi/api/draw-results/v1/games/EJACKPOT/draws/by-week/{year}-W{week}").json()
+        f"https://www.veikkaus.fi/api/draw-results/v1/games/EJACKPOT/draws/by-week/{year}-W{week:02d}").json()
 
     return [EuroJackpot(e) for e in r]
 
